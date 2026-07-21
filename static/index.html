@@ -6,14 +6,15 @@
   <title>模型识别验证服务</title>
   <style>
     * { box-sizing: border-box; }
-    body { margin: 0; font-family: -apple-system, "Segoe UI", "Microsoft YaHei", sans-serif; background: #f5f7fa; color: #333; }
-    .topbar { background: #1f2d3d; color: #fff; padding: 12px 20px; font-size: 18px; font-weight: 600; display: flex; align-items: center; }
-    .layout { display: flex; gap: 12px; padding: 12px; }
-    .col { background: #fff; border-radius: 8px; padding: 14px; box-shadow: 0 1px 4px rgba(0,0,0,0.08); }
-    .col-config { width: 320px; flex: none; }
+    html, body { height: 100%; }
+    body { margin: 0; font-family: -apple-system, "Segoe UI", "Microsoft YaHei", sans-serif; background: #f5f7fa; color: #333; display: flex; flex-direction: column; height: 100vh; overflow: hidden; }
+    .topbar { background: #1f2d3d; color: #fff; padding: 12px 20px; font-size: 18px; font-weight: 600; display: flex; align-items: center; flex: none; }
+    .layout { display: flex; gap: 12px; padding: 12px; flex: 1; min-height: 0; overflow: hidden; }
+    .col { background: #fff; border-radius: 8px; padding: 14px; box-shadow: 0 1px 4px rgba(0,0,0,0.08); display: flex; flex-direction: column; overflow: hidden; }
+    .col-config { width: 320px; flex: none; overflow-y: auto; }
     .col-list { width: 280px; flex: none; }
     .col-detail { flex: 1; min-width: 0; }
-    h3 { margin: 0 0 10px; font-size: 15px; border-left: 3px solid #2d8cf0; padding-left: 8px; }
+    h3 { margin: 0 0 10px; font-size: 15px; border-left: 3px solid #2d8cf0; padding-left: 8px; flex: none; }
     .field { margin-bottom: 8px; }
     .field label { display: block; font-size: 12px; color: #666; margin-bottom: 3px; }
     .field input, .field select { width: 100%; padding: 6px 8px; border: 1px solid #dcdfe6; border-radius: 4px; font-size: 13px; }
@@ -26,7 +27,7 @@
     .group-head h4 { margin: 0; font-size: 14px; color: #1f2d3d; }
     .btn-test { background: #67c23a; color: #fff; padding: 4px 12px; font-size: 12px; }
     .btn-test:hover { background: #5daf34; }
-    .list { max-height: 70vh; overflow: auto; }
+    .list { flex: 1; min-height: 0; overflow: auto; }
     .list-item { padding: 8px 10px; border: 1px solid #eee; border-radius: 4px; margin-bottom: 6px; cursor: pointer; font-size: 13px; }
     .list-item.active { border-color: #2d8cf0; background: #f0f7ff; }
     .badge { display: inline-block; font-size: 11px; padding: 1px 6px; border-radius: 8px; margin-left: 6px; }
@@ -35,6 +36,7 @@
     .b-timeout { background: #f5e1c0; color: #b8740c; }
     .b-sent { background: #e8e8e8; color: #777; }
     .detail-empty { color: #999; font-size: 14px; padding: 40px 0; text-align: center; }
+    #detail { flex: 1; min-height: 0; overflow: auto; }
     .row { display: flex; gap: 12px; }
     .row > div { flex: 1; min-width: 0; }
     .meta { font-size: 12px; color: #666; margin-bottom: 8px; word-break: break-all; }
