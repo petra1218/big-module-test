@@ -1,67 +1,84 @@
 <!DOCTYPE html>
 <html lang="zh-CN">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>模型识别验证服务</title>
-<style>
-  * { box-sizing: border-box; }
-  body { margin: 0; font-family: -apple-system, "Segoe UI", "Microsoft YaHei", sans-serif; background: #f5f6f8; color: #222; }
-  .topbar { background: #1f2d3d; color: #fff; padding: 12px 20px; font-size: 18px; font-weight: 600; }
-  .layout { display: flex; height: calc(100vh - 48px); }
-  .config-panel { width: 320px; min-width: 320px; padding: 16px; overflow-y: auto; background: #fff; border-right: 1px solid #e3e6ea; }
-  .config-panel h3 { margin: 0 0 12px; font-size: 15px; }
-  .field { display: flex; flex-direction: column; margin-bottom: 10px; font-size: 12px; color: #555; }
-  .field input { padding: 6px 8px; border: 1px solid #ccd1d8; border-radius: 4px; font-size: 13px; }
-  .actions { display: flex; gap: 8px; margin-top: 8px; }
-  .actions button { flex: 1; padding: 8px; border: none; border-radius: 4px; cursor: pointer; font-size: 14px; }
-  #startBtn { background: #2d8cf0; color: #fff; }
-  #stopBtn { background: #e0e0e0; color: #333; }
-  #statusMsg { margin-top: 10px; font-size: 12px; color: #d4380d; min-height: 16px; }
-  .results { flex: 1; display: flex; min-width: 0; }
-  .img-list { width: 260px; min-width: 260px; border-right: 1px solid #e3e6ea; background: #fff; overflow-y: auto; padding: 8px; }
-  .item { padding: 8px; border-radius: 4px; cursor: pointer; font-size: 13px; display: flex; align-items: center; gap: 6px; }
-  .item:hover { background: #f0f5ff; }
-  .item.active { background: #e6f0ff; }
-  .fname { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .badge { font-size: 11px; padding: 1px 6px; border-radius: 10px; color: #fff; white-space: nowrap; }
-  .b_已发送 { background: #8c8c8c; }
-  .b_已完成 { background: #2d8cf0; }
-  .b_有预警 { background: #fa8c16; }
-  .b_超时 { background: #d4380d; }
-  .detail { flex: 1; padding: 16px; overflow-y: auto; }
-  .hint { color: #999; }
-  .imgs { display: flex; gap: 16px; flex-wrap: wrap; margin-bottom: 16px; }
-  .imgs > div { flex: 1; min-width: 280px; }
-  .cap { font-size: 12px; color: #888; margin-bottom: 4px; }
-  .imgs img, .imgs canvas { max-width: 100%; border: 1px solid #ddd; background: #000; }
-  .cols { display: flex; gap: 16px; }
-  .col { flex: 1; min-width: 0; background: #fff; border: 1px solid #e3e6ea; border-radius: 4px; padding: 10px; }
-  .col h4 { margin: 0 0 8px; font-size: 13px; }
-  .kv { font-size: 12px; line-height: 1.7; border-bottom: 1px dashed #eee; padding: 4px 0; word-break: break-all; }
-  .kv b { color: #555; }
-  .muted { color: #aaa; font-size: 12px; }
-</style>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>模型识别验证服务</title>
+  <style>
+    * { box-sizing: border-box; }
+    body { margin: 0; font-family: -apple-system, "Segoe UI", "Microsoft YaHei", sans-serif; background: #f5f7fa; color: #333; }
+    .topbar { background: #1f2d3d; color: #fff; padding: 12px 20px; font-size: 18px; font-weight: 600; display: flex; align-items: center; }
+    .layout { display: flex; gap: 12px; padding: 12px; }
+    .col { background: #fff; border-radius: 8px; padding: 14px; box-shadow: 0 1px 4px rgba(0,0,0,0.08); }
+    .col-config { width: 320px; flex: none; }
+    .col-list { width: 280px; flex: none; }
+    .col-detail { flex: 1; min-width: 0; }
+    h3 { margin: 0 0 10px; font-size: 15px; border-left: 3px solid #2d8cf0; padding-left: 8px; }
+    .field { margin-bottom: 8px; }
+    .field label { display: block; font-size: 12px; color: #666; margin-bottom: 3px; }
+    .field input, .field select { width: 100%; padding: 6px 8px; border: 1px solid #dcdfe6; border-radius: 4px; font-size: 13px; }
+    .btn-row { display: flex; gap: 8px; margin: 10px 0; }
+    button { cursor: pointer; border: none; border-radius: 4px; padding: 7px 14px; font-size: 13px; }
+    .btn-primary { background: #2d8cf0; color: #fff; }
+    .btn-ghost { background: #eef0f3; color: #333; }
+    .list { max-height: 70vh; overflow: auto; }
+    .list-item { padding: 8px 10px; border: 1px solid #eee; border-radius: 4px; margin-bottom: 6px; cursor: pointer; font-size: 13px; }
+    .list-item.active { border-color: #2d8cf0; background: #f0f7ff; }
+    .badge { display: inline-block; font-size: 11px; padding: 1px 6px; border-radius: 8px; margin-left: 6px; }
+    .b-done { background: #e1f3d8; color: #529b2e; }
+    .b-alarm { background: #fde2e2; color: #c0392b; }
+    .b-timeout { background: #f5e1c0; color: #b8740c; }
+    .b-sent { background: #e8e8e8; color: #777; }
+    .detail-empty { color: #999; font-size: 14px; padding: 40px 0; text-align: center; }
+    .row { display: flex; gap: 12px; }
+    .row > div { flex: 1; min-width: 0; }
+    .meta { font-size: 12px; color: #666; margin-bottom: 8px; word-break: break-all; }
+    canvas { max-width: 100%; border: 1px solid #eee; background: #fafafa; border-radius: 4px; }
+    pre { background: #f8f9fb; border: 1px solid #eee; border-radius: 4px; padding: 8px; font-size: 12px; max-height: 240px; overflow: auto; white-space: pre-wrap; word-break: break-all; }
+    .logpanel { position: fixed; left: 0; right: 0; bottom: 0; height: 240px; background: #1e1e1e; color: #d4d4d4; display: none; flex-direction: column; font-family: Consolas, "Courier New", monospace; font-size: 12px; z-index: 50; border-top: 2px solid #2d8cf0; }
+    .logpanel.show { display: flex; }
+    .logpanel .lh { display: flex; align-items: center; gap: 10px; padding: 4px 10px; background: #111; color: #fff; font-size: 12px; }
+    .logpanel .lh button { padding: 2px 10px; cursor: pointer; border: none; border-radius: 3px; background: #2d8cf0; color: #fff; }
+    .logpanel pre { flex: 1; overflow: auto; margin: 0; padding: 8px 10px; white-space: pre-wrap; word-break: break-all; line-height: 1.5; background: #1e1e1e; border: none; color: #d4d4d4; }
+  </style>
 </head>
 <body>
-<div class="topbar">模型识别验证服务</div>
-<div class="layout">
-  <div class="config-panel">
-    <h3>配置（运行期内驻留内存）</h3>
-    <form id="cfgForm"></form>
-    <div class="actions">
-      <button id="startBtn">开始验证</button>
-      <button id="stopBtn">停止</button>
-    </div>
-    <div id="statusMsg"></div>
+  <div class="topbar">
+    <span>模型识别验证服务</span>
+    <button id="logBtn" style="margin-left:auto;background:#2d8cf0;border:none;color:#fff;padding:4px 12px;border-radius:4px;cursor:pointer;">调试日志</button>
   </div>
-  <div class="results">
-    <div class="img-list" id="imgList"></div>
-    <div class="detail" id="detail">
-      <p class="hint">从左侧选择一张图片查看识别结果</p>
+
+  <div class="layout">
+    <div class="col col-config">
+      <h3>配置（运行期驻留内存 + 本地记忆）</h3>
+      <form id="cfgForm"></form>
+      <div class="btn-row">
+        <button class="btn-primary" id="startBtn">开始验证</button>
+        <button class="btn-ghost" id="stopBtn">停止</button>
+      </div>
+      <div id="status" style="font-size:13px;color:#555;"></div>
+    </div>
+
+    <div class="col col-list">
+      <h3>图片列表</h3>
+      <div class="list" id="imgList"></div>
+    </div>
+
+    <div class="col col-detail">
+      <h3>识别结果</h3>
+      <div id="detail"><div class="detail-empty">请选择左侧图片查看结果</div></div>
     </div>
   </div>
-</div>
-<script src="/static/app.js"></script>
+
+  <div class="logpanel" id="logPanel">
+    <div class="lh">
+      <span>调试日志（最近 200 条，每 2 秒自动刷新）</span>
+      <button id="logRefresh">刷新</button>
+      <button id="logClose">关闭</button>
+    </div>
+    <pre id="logBody"></pre>
+  </div>
+
+  <script src="/static/app.js"></script>
 </body>
 </html>

@@ -1,179 +1,223 @@
-const LS_KEY = "verify_cfg";
+// 模型识别验证服务 前端逻辑
+
+// 左侧配置字段：大模型服务登录使用 AppKey/AppSecret（即 AK/SK）
 const FIELDS = [
-  ["app_key", "平台 AppKey", "text"],
-  ["app_secret", "平台 AppSecret", "password"],
-  ["api_base", "平台地址 api_base (http://ip:port)", "text"],
-  ["ws_base", "WebSocket 地址 ws_base (ws://ip:port)", "text"],
-  ["minio_endpoint", "MinIO endpoint (minio-host:9000)", "text"],
+  ["app_key", "大模型服务 AppKey (AK)", "text"],
+  ["app_secret", "大模型服务 AppSecret (SK)", "password"],
+  ["api_base", "API Base (登录/WS域名, 不含路径)", "text"],
+  ["ws_base", "WebSocket Base (不含 /apiWs)", "text"],
+  ["minio_endpoint", "MinIO Endpoint", "text"],
   ["minio_access_key", "MinIO AccessKey", "text"],
   ["minio_secret_key", "MinIO SecretKey", "password"],
   ["minio_bucket", "MinIO Bucket", "text"],
-  ["minio_secure", "MinIO secure (true/false)", "text"],
-  ["minio_public_base_url", "MinIO 公开基址 (http://host:9000/bucket)", "text"],
-  ["directory", "目录名", "text"],
-  ["kafka_bootstrap_servers", "Kafka broker (ip:9092)", "text"],
-  ["concurrency", "并发数 (默认5)", "text"],
-  ["timeout_seconds", "超时秒数 (默认300)", "text"],
+  ["minio_secure", "MinIO Secure (true/false)", "text"],
+  ["minio_public_base_url", "MinIO 公网 Base URL", "text"],
+  ["directory", "MinIO 目录 (如 /vehicle/sichuan)", "text"],
+  ["kafka_bootstrap_servers", "Kafka BootstrapServers", "text"],
+  ["topic_receive_image", "接图 Topic", "text"],
+  ["device_id", "设备ID", "text"],
+  ["device_name", "设备名称", "text"],
+  ["concurrency", "并发数", "number"],
+  ["timeout_seconds", "超时秒数", "number"],
 ];
 
-const form = document.getElementById("cfgForm");
-FIELDS.forEach(([k, label, type]) => {
-  const wrap = document.createElement("label");
-  wrap.className = "field";
-  const span = document.createElement("span");
-  span.textContent = label;
-  const inp = document.createElement("input");
-  inp.name = k; inp.id = "f_" + k; inp.type = type || "text"; inp.autocomplete = "off";
-  wrap.appendChild(span);
-  wrap.appendChild(inp);
-  form.appendChild(wrap);
-});
+const LS_KEY = "verify_cfg_v1";
+let currentId = null;
+let pollTimer = null;
 
-function loadSaved() {
-  try {
-    const s = JSON.parse(localStorage.getItem(LS_KEY) || "{}");
-    Object.keys(s).forEach(k => {
-      const el = document.getElementById("f_" + k);
-      if (el) el.value = s[k];
-    });
-  } catch (e) {}
+// ---------- 配置表单 ----------
+function buildForm() {
+  const form = document.getElementById("cfgForm");
+  const saved = JSON.parse(localStorage.getItem(LS_KEY) || "{}");
+  form.innerHTML = "";
+  FIELDS.forEach(([key, label, type]) => {
+    const div = document.createElement("div");
+    div.className = "field";
+    const lab = document.createElement("label");
+    lab.textContent = label;
+    const inp = document.createElement("input");
+    inp.name = key;
+    inp.type = type;
+    inp.value = saved[key] ?? "";
+    div.appendChild(lab);
+    div.appendChild(inp);
+    form.appendChild(div);
+  });
 }
+
 async function loadServerConfig() {
   try {
     const r = await fetch("/api/config");
-    const d = await r.json();
-    Object.keys(d).forEach(k => {
-      const el = document.getElementById("f_" + k);
-      if (el) el.value = d[k];
+    const cfg = await r.json();
+    const form = document.getElementById("cfgForm");
+    FIELDS.forEach(([key]) => {
+      const inp = form.elements[key];
+      if (inp && cfg[key] != null && inp.value === "") {
+        inp.value = cfg[key];
+      }
     });
-  } catch (e) {}
+  } catch (e) {
+    console.warn("读取服务端配置失败", e);
+  }
 }
-loadSaved();
-loadServerConfig();
 
-let polling = false;
-let selectedId = null;
-let lastData = null;
-
-function setMsg(t) { document.getElementById("statusMsg").textContent = t; }
-
-document.getElementById("startBtn").onclick = async () => {
+function collectForm() {
+  const form = document.getElementById("cfgForm");
   const cfg = {};
-  FIELDS.forEach(([k]) => {
-    const el = document.getElementById("f_" + k);
-    cfg[k] = el.value;
+  FIELDS.forEach(([key]) => {
+    cfg[key] = form.elements[key].value.trim();
   });
   localStorage.setItem(LS_KEY, JSON.stringify(cfg));
-  setMsg("正在启动…");
-  try {
-    const r = await fetch("/api/start", {
-      method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(cfg),
-    });
-    const d = await r.json();
-    if (d.ok) { setMsg("已启动，正在接收结果…"); startPolling(); }
-    else setMsg("启动失败: " + JSON.stringify(d));
-  } catch (e) { setMsg("启动异常: " + e); }
-};
-
-document.getElementById("stopBtn").onclick = async () => {
-  try { await fetch("/api/stop", { method: "POST" }); } catch (e) {}
-  stopPolling();
-  setMsg("已停止");
-};
-
-function startPolling() { if (polling) return; polling = true; tick(); }
-function stopPolling() { polling = false; }
-async function tick() {
-  if (!polling) return;
-  try {
-    const r = await fetch("/api/results");
-    const d = await r.json();
-    render(d);
-  } catch (e) {}
-  setTimeout(tick, 2000);
+  return cfg;
 }
 
-function render(d) {
-  lastData = d;
+// ---------- 列表与详情 ----------
+function statusBadge(status) {
+  const map = {
+    "已完成": "b-done",
+    "有预警": "b-alarm",
+    "超时": "b-timeout",
+    "已发送": "b-sent",
+  };
+  const cls = map[status] || "b-sent";
+  return `<span class="badge ${cls}">${status}</span>`;
+}
+
+async function refreshList() {
+  const r = await fetch("/api/results");
+  const d = await r.json();
   const list = document.getElementById("imgList");
   list.innerHTML = "";
-  d.items.forEach(it => {
+  d.items.forEach((it) => {
     const div = document.createElement("div");
-    div.className = "item" + (it.id === selectedId ? " active" : "");
-    div.innerHTML = `<span class="badge b_${it.status}">${it.status}</span>` +
-      `<span class="fname">${esc(it.filename || it.id)}</span>`;
-    div.onclick = () => { selectedId = it.id; render(d); };
+    div.className = "list-item" + (it.id === currentId ? " active" : "");
+    div.innerHTML = `${it.filename || it.id}${statusBadge(it.status)}`;
+    div.onclick = () => { currentId = it.id; renderDetail(it); refreshList(); };
     list.appendChild(div);
   });
-  if (!selectedId && d.items.length) selectedId = d.items[0].id;
-  const cur = d.items.find(x => x.id === selectedId);
-  const detail = document.getElementById("detail");
-  if (!cur) { detail.innerHTML = '<p class="hint">从左侧选择一张图片查看识别结果</p>'; return; }
-  detail.innerHTML = renderDetail(cur);
-  const canvas = detail.querySelector("canvas");
-  drawCanvas(canvas, cur.minio_url, cur.alarms);
+  if (currentId) {
+    const cur = d.items.find((x) => x.id === currentId);
+    if (cur) renderDetail(cur);
+  }
 }
 
 function renderDetail(it) {
-  const streamHtml = it.stream.length
-    ? it.stream.map(s => `<div class="kv"><b>themeLabel:</b> ${esc(s.themeLabel)} ` +
-        `<b>ocrMessage:</b> ${esc(s.ocrMessage)} <b>sourceName:</b> ${esc(s.sourceName)} ` +
-        `<b>耗时:</b> ${dur(s)} <b>isError:</b> ${esc(s.isError)}</div>`).join("")
-    : '<div class="muted">无流水记录</div>';
-  const alarmHtml = it.alarms.length
-    ? it.alarms.map(a => {
-        let boxes = [];
-        try { boxes = JSON.parse(a.alarmBoxs || "[]"); } catch (e) {}
-        return `<div class="kv"><b>themeLabel:</b> ${esc(a.themeLabel)} ` +
-          `<b>alarmLevel:</b> ${esc(a.alarmLevel)} <b>框数:</b> ${boxes.length}</div>`;
-      }).join("")
-    : '<div class="muted">无预警记录</div>';
-  return `
-    <h3>${esc(it.filename || it.id)} <span class="badge b_${it.status}">${it.status}</span></h3>
-    <div class="imgs">
-      <div><div class="cap">原图</div><img src="${it.minio_url}" onerror="this.alt='图片加载失败(确认MinIO可达)'"></div>
-      <div><div class="cap">检测框</div><canvas></canvas></div>
-    </div>
-    <div class="cols">
-      <div class="col"><h4>流水信息 (${it.stream_count})</h4>${streamHtml}</div>
-      <div class="col"><h4>预警信息 (${it.alarm_count})</h4>${alarmHtml}</div>
-    </div>`;
+  const el = document.getElementById("detail");
+  const drawUrl = it.minio_url || (it.stream[0] && it.stream[0].sceneImgUrl);
+  let html = `<div class="meta">文件: ${it.filename || "-"} | 状态: ${statusBadge(it.status)} | 流水: ${it.stream_count} 条 | 预警: ${it.alarm_count} 条</div>`;
+  if (it.minio_url) html += `<div class="meta">MinIO: ${it.minio_url}</div>`;
+  html += `<div class="row"><div>`;
+  if (drawUrl) {
+    html += `<img id="srcImg" src="${drawUrl}" style="max-width:100%;border:1px solid #eee;border-radius:4px;" onload="drawBoxes()" />`;
+    html += `<canvas id="boxCanvas" style="position:relative;"></canvas>`;
+  } else {
+    html += `<div class="detail-empty">无图片地址</div>`;
+  }
+  html += `</div><div>`;
+  html += `<div style="font-size:13px;font-weight:600;margin-bottom:6px;">流水信息</div><pre id="streamPre">${formatJson(it.stream)}</pre>`;
+  html += `<div style="font-size:13px;font-weight:600;margin:10px 0 6px;">预警信息</div><pre id="alarmPre">${formatJson(it.alarms)}</pre>`;
+  html += `</div></div>`;
+  el.innerHTML = html;
 }
 
-function drawCanvas(canvas, url, alarms) {
-  const img = new Image();
-  img.onload = () => {
-    const MAXW = 560;
-    const scale = Math.min(MAXW / img.naturalWidth, 1) || 1;
-    canvas.width = img.naturalWidth * scale;
-    canvas.height = img.naturalHeight * scale;
-    const ctx = canvas.getContext("2d");
-    ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-    const boxes = [];
-    (alarms || []).forEach(a => {
-      try { JSON.parse(a.alarmBoxs || "[]").forEach(b => boxes.push(b)); } catch (e) {}
-    });
+function formatJson(v) {
+  try { return JSON.stringify(v, null, 2); } catch (e) { return String(v); }
+}
+
+window.drawBoxes = function () {
+  const img = document.getElementById("srcImg");
+  const canvas = document.getElementById("boxCanvas");
+  if (!img || !canvas) return;
+  const w = img.naturalWidth, h = img.naturalHeight;
+  if (!w || !h) return;
+  // 画布按原图像素尺寸绘制，再用 CSS 缩放到显示尺寸，保证绝对像素坐标对齐
+  canvas.width = w; canvas.height = h;
+  canvas.style.width = img.clientWidth + "px";
+  canvas.style.height = img.clientHeight + "px";
+  const ctx = canvas.getContext("2d");
+  ctx.clearRect(0, 0, w, h);
+  const alarmBoxs = (currentAlarms() || []).flatMap((a) => a.alarmBoxs || []);
+  alarmBoxs.forEach((b) => {
+    const x = Number(b.x), y = Number(b.y), bw = Number(b.width), bh = Number(b.height);
+    if ([x, y, bw, bh].some((n) => Number.isNaN(n))) return;
+    ctx.strokeStyle = "#e74c3c";
     ctx.lineWidth = 2;
-    ctx.strokeStyle = "#ff3b30";
-    ctx.font = "14px sans-serif";
-    boxes.forEach(b => {
-      const [x1, y1, x2, y2] = b.box;
-      const X = x1 * scale, Y = y1 * scale, W = (x2 - x1) * scale, H = (y2 - y1) * scale;
-      ctx.strokeRect(X, Y, W, H);
-      const label = (b.tag || "") + (b.conf != null ? " " + (b.conf * 100).toFixed(1) + "%" : "");
-      ctx.fillStyle = "rgba(255,59,48,0.9)";
-      ctx.fillText(label, X, Y > 14 ? Y - 3 : Y + 14);
-    });
-    if (!boxes.length) { ctx.fillStyle = "#888"; ctx.fillText("无检测框", 10, 20); }
-  };
-  img.src = url;
+    ctx.strokeRect(x, y, bw, bh);
+    if (b.tag) {
+      ctx.fillStyle = "#e74c3c";
+      ctx.font = "12px sans-serif";
+      ctx.fillText(`${b.tag}${b.conf != null ? " " + b.conf : ""}`, x, y > 12 ? y - 4 : y + 12);
+    }
+  });
+};
+
+let _lastAlarms = [];
+function currentAlarms() { return _lastAlarms; }
+
+// 轮询结果，并在拿到新数据时记录预警用于画框
+async function poll() {
+  const r = await fetch("/api/results");
+  const d = await r.json();
+  _lastAlarms = [];
+  d.items.forEach((it) => { if (it.alarms) _lastAlarms.push(...it.alarms); });
+  await refreshList();
+  if (currentId) {
+    const cur = d.items.find((x) => x.id === currentId);
+    if (cur) renderDetail(cur);
+  }
 }
 
-function dur(s) {
-  if (!s.inTime || !s.outTime) return "-";
-  try { return ((Number(s.outTime) - Number(s.inTime)) / 1000).toFixed(2) + "s"; } catch (e) { return "-"; }
+// ---------- 调试日志面板 ----------
+const logPanel = document.getElementById("logPanel");
+const logBody = document.getElementById("logBody");
+let logOpen = false, logTimer = null;
+
+document.getElementById("logBtn").onclick = () => {
+  logOpen = !logOpen;
+  logPanel.classList.toggle("show", logOpen);
+  if (logOpen) { fetchLogs(); logTimer = setInterval(fetchLogs, 2000); }
+  else { clearInterval(logTimer); }
+};
+document.getElementById("logClose").onclick = () => {
+  logOpen = false; logPanel.classList.remove("show"); clearInterval(logTimer);
+};
+document.getElementById("logRefresh").onclick = fetchLogs;
+
+async function fetchLogs() {
+  if (!logOpen) return;
+  try {
+    const r = await fetch("/api/logs?limit=200");
+    const d = await r.json();
+    logBody.textContent = (d.logs || []).join("\n");
+    logBody.scrollTop = logBody.scrollHeight;
+  } catch (e) { /* 忽略 */ }
 }
-function esc(v) {
-  if (v == null) return "";
-  return String(v).replace(/[&<>]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[c]));
-}
+
+// ---------- 操作 ----------
+document.getElementById("startBtn").onclick = async () => {
+  const cfg = collectForm();
+  document.getElementById("status").textContent = "正在启动...";
+  const r = await fetch("/api/start", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(cfg),
+  });
+  const d = await r.json();
+  if (d.ok) {
+    document.getElementById("status").textContent = `已发起 ${d.count} 张图片，正在接收...`;
+    if (!pollTimer) pollTimer = setInterval(poll, 2000);
+    poll();
+  } else {
+    document.getElementById("status").textContent = "启动失败: " + d.error;
+  }
+};
+
+document.getElementById("stopBtn").onclick = async () => {
+  await fetch("/api/stop", { method: "POST" });
+  document.getElementById("status").textContent = "已停止";
+  if (pollTimer) { clearInterval(pollTimer); pollTimer = null; }
+};
+
+// ---------- 初始化 ----------
+buildForm();
+loadServerConfig();

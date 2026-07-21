@@ -19,8 +19,8 @@ chmod +x start.sh
 ## 使用流程
 
 1. 浏览器打开 `http://<本机IP>:10086/`。
-2. 在左侧配置区填写（运行期内驻留内存，刷新不丢）：
-   - 平台登录：`app_key` / `app_secret`
+2. 在左侧配置区填写（运行期内驻留内存，刷新不丢；也记忆在浏览器 localStorage）：
+   - 大模型服务登录（AK/SK）：`app_key` / `app_secret`（即登录大模型服务使用的 AK/SK）
    - 平台地址：`api_base`（如 `http://ip:port`）、`ws_base`（如 `ws://ip:port`）
    - MinIO：`endpoint` / `access_key` / `secret_key` / `bucket` / `secure`（用于遍历目录）
    - MinIO 公开基址：`minio_public_base_url`（模型可直连，拼成 `SceneImageUrl`）
@@ -32,6 +32,18 @@ chmod +x start.sh
 ## 数据流
 
 Kafka 发（`Q_VEHICLE_FRONT_FACE_SHARE_TO_XQ`，无需 SASL）→ WebSocket 收（`/apiWs/stream/data` 流水、`/apiWs/alarm/data` 预警，Bearer 鉴权）。关联键：请求里的 `ID` 回显到 `kafkaReceiveImageId`，`Expand` 兜底回显到 `kafkaReceiveExpand`，双字段 join。
+
+## 调试日志
+
+为方便对接调试时判断错误，服务输出统一日志：
+
+- 控制台实时打印，同时写入 `service.log`（已被 `.gitignore` 忽略）。
+- 关键节点（登录 / MinIO 遍历 / Kafka 发送 / WebSocket 连接接收重连 / 结果入库超时）均有记录，`app_secret` / `minio_secret_key` / `app_key` / token 已脱敏（仅保留前后几位）。
+- 前端右上角「调试日志」按钮打开底部面板，实时展示最近 200 条日志（每 2 秒自动刷新），也可直接访问 `GET /api/logs?limit=200`。
+
+## 修改追溯
+
+每次代码修改的执行内容与结果记录在 `docs/process/` 目录，并在 `docs/process/INDEX.md` 汇总索引，便于追溯。
 
 ## 说明
 
