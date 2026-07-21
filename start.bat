@@ -5,7 +5,7 @@ cd /d "%~dp0"
 rem Use a virtual environment (venv); dependencies are installed only into .venv
 set VENV_DIR=.venv
 if not exist "%VENV_DIR%\Scripts\activate.bat" (
-  echo Creating virtual environment (.venv) ...
+  echo Creating virtual environment in %VENV_DIR% ...
   python -m venv %VENV_DIR%
 )
 call "%VENV_DIR%\Scripts\activate.bat"
