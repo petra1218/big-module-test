@@ -1,0 +1,676 @@
+四川警察学院项目
+安全认证
+1.
+1.1登录接口
+基本信息
+Path： /token/auth/login
+Method： POST
+接口描述：
+登录接口
+请求参数
+Headers
+参数名称 参数值 是否必须 示例 备注
+Content-Type application/json 是
+Body
+名称 类型 是否必须 默认值 备注 其他信息
+appKey string 必须 系统名称
+appSecret string 必须 系统秘钥
+
+返回数据
+是否必 默认 其他信
+名称 类型 备注
+须 值 息
+code integer 非必须 响应码
+状态码，0成功，其他为错误
+msg string 非必须 响应消息
+成功时可为success
+data object 非必须 响应数据
+成功时返回token信息，失败为
+null
+├─ string 非必须 访问Token
+accessToken 用于访问api接口
+├─ string 非必须 刷新Token
+refreshToken 用于刷新token的过期时间
+1.2刷新接口
+基本信息
+Path： /token/auth/refresh
+Method： POST
+接口描述：
+请求参数
+Headers
+参数名称 参数值 是否必须 示例 备注
+Content-Type application/json 是
+Body
+
+名称 类型 是否必须 默认值 备注 其他信息
+refreshToken string 必须 刷新token值
+返回数据
+是否必 默认 其他信
+名称 类型 备注
+须 值 息
+code integer 非必须 响应码
+0 表示成功，其他为错误
+msg string 非必须 响应消息
+成功时可为success
+data object 非必须 响应数据
+成功时返回访问token值，失败为
+null
+├─ string 非必须 访问token值
+accessToken ⽤于访问api接⼝
+1.3退出登录接口
+基本信息
+Path： /token/auth/logout
+Method： POST
+接口描述：
+请求参数
+Headers
+参数名称 参数值 是否必须 示例 备注
+Content-Type application/json 是
+
+参数名称 参数值 是否必须 示例 备注
+Body
+名称 类型 是否必须 默认值 备注 其他信息
+accessToken string 必须 访问token值
+返回数据
+名 是否必 默认 其他信
+类型 备注
+称 须 值 息
+code integer 非必须 响应码
+0表示成功，其他为错误
+msg string 非必须 响应消息
+响应消息 成功时可为success
+data object 非必须 响应数据
+响应数据 成功时返回访问token值，失败为
+null
+对接协议
+2.Kafa
+2.1kafka接图
+基本信息
+Path： /receive
+Method： HEAD
+接口描述：
+
+1. Kafka Topic 名称
+项 值
+Topic 名称 Q_VEHICLE_FRONT_FACE_SHARE_TO_XQ(支持自定义)
+说明 第三方系统需向该 Topic 获取数据
+2. 推送数据字段说明
+DeviceID 与 IndexCode 为二选一的必要参数，优先使用 DeviceID；若 DeviceID 为空但
+IndexCode 有值，则将 IndexCode 赋值给 DeviceID，统一设备标识维度
+字段名 类型 说明 其他
+ID string 数据 ID 32 位
+DeviceID string 设备 ID 二选一的必要参数
+IndexCode string 对接设备唯一标识 二选一的必要参数
+DeviceName string 设备名称 必填
+SceneImageUrl string 图片路径 必填
+CatTime string 抓拍时间 必填，格式 yyyy-MM-dd HH:mm:ss
+Lat DOUBLE 纬度
+Lng DOUBLE 经度
+Expand string 扩展
+3. 推送 JSON 数据示例
+{
+"ID": "3066b46cd2a152093ec29354827d64d",
+"DeviceID": "deviceId001",
+"IndexCode": "indexcode001",
+"DeviceName": "设备名称",
+"SceneImageUrl": "http://ip:port/20250101/image.jpg",
+"CatTime": "2026-03-01 18:18:18",
+"Lat": 116.40,
+"Lng": 39.91,
+"Expand": "{\"code\":\"asdcfsadf123\",\"remark\":\"remark\"}"
+}
+
+4. 字段说明补充
+4.1 Expand 结构说明
+该字段为 JSON 字符串，解析后结构如下：
+{
+"code": "asdcfsadf123",
+"remark": "remark"
+}
+2.2流水kafka推送
+基本信息
+Path： /stream
+Method： HEAD
+接口描述：
+1. Kafka Topic 名称
+项 值
+Topic 名称 RUNNING_WATER_DATA_TOPIC(支持自定义)
+说明 第三方系统需向该Topic获取数据
+2. 推送数据字段说明
+字段名 类型 说明 其他
+createTime String(date- 创建时间
+time)
+themeTypeId String 主题 ID
+
+字段名 类型 说明 其他
+taskId String 任务 ID
+taskName String 任务名称
+themeName String 主题名称
+themeDataId String 主题数据 ID
+themeLabel String 主题数据标签
+label String 标签
+inPic String 图片输入地址
+sourceId String 来源 ID
+message String 解析信息
+sourceType Integer 来源类型 1 - 图片
+2 - 视频
+3 - 摄像头
+sourceName String 来源名称（附件名称 / 设备名
+称）
+duration String 时长
+inTime String(date- 解析开始时间
+time)
+outTime String(date- 解析完成时间
+time)
+receptionTime String(date- 接收时间
+time)
+picInVideoTime String 解析图片在视频中时间
+taskCreateUser Long 任务创建人
+lat String 纬度
+lng String 经度
+gbCode String 国标编码
+ocrMessage String OCR 返回信息
+monitoringArea String 监控区域 JSON 字符串格
+式
+
+字段名 类型 说明 其他
+targetExpand String 目标跟踪拓展字段
+isError String 是否异常数据 0 - 正常
+1 - 异常
+kafkaReceiveImageId String Kafka 收图图片 ID
+kafkaReceiveExpand String Kafka 收图扩展字段
+3. 推送 JSON 数据示例
+{
+"createTime": "2026-05-13 17:56:03",
+"themeTypeId": "4a7e2ba826b6cae289320e3f15956101",
+"taskId": "035d3168e6766243147f0267808ec9c3",
+"taskName": "找人",
+"themeName": "zhzt",
+"themeDataId": "a396695fe6178440325f987c414fb00c",
+"themeLabel": "找人",
+"label": null,
+"inPic": "http://xxxxxxxx.jpg",
+"sourceId": "00c7aac901f94a679a94029c1rd6198c",
+"message": null,
+"sourceType": 3,
+"sourceName": "摄像头",
+"duration": null,
+"inTime": "2026-05-13 17:56:02",
+"outTime": "2026-05-13 17:56:03",
+"receptionTime": "2026-05-13 17:56:28",
+"picInVideoTime": null,
+"taskCreateUser": 10043,
+"lat": "34.44",
+"lng": "12.22",
+"gbCode": "123456789",
+"ocrMessage": null,
+"monitoringArea": "[{\"monitoringAreaCode\":\"test\",\"monitoringAreaVOList\":
+[{\"x\":\"42\",\"y\":\"19\"},{\"x\":\"1250\",\"y\":\"21\"},
+{\"x\":\"1238\",\"y\":\"678\"},{\"x\":\"43\",\"y\":\"685\"}]}]",
+"targetExpand": null,
+
+"isError": null,
+"kafkaReceiveImageId": null,
+"kafkaReceiveExpand": null
+}
+4. 字段说明补充
+4.1 monitoringArea 结构说明
+该字段为 JSON 字符串，解析后结构如下：
+{
+"monitoringAreaCode": "区域编码",
+"monitoringAreaVOList": [
+{ "x": "坐标x", "y": "坐标y" },
+{ "x": "坐标x", "y": "坐标y" },
+{ "x": "坐标x", "y": "坐标y" },
+{ "x": "坐标x", "y": "坐标y" }
+]
+}
+monitoringAreaCode：监控区域编码
+monitoringAreaVOList：监控区域的多边形坐标点集合，按顺序构成闭合区域
+请求参数
+返回数据
+名称 类型 是否必须 默认值 备注 其他信息
+
+2.3预警kafka推送
+基本信息
+Path： /alarm
+Method： HEAD
+接口描述：
+1. Kafka Topic 名称
+项 值
+Topic 名称 ALARM_DATA_TOPIC(支持自定义)
+说明 第三方系统需向该Topic获取数据
+2. 推送数据字段说明
+字段名 类型 说明 其他
+taskId String 任务 ID
+streamId String 流水 ID
+themeTypeId String 主题类型 ID
+themeName String 主题名称 ID
+themeDataId String 主题数据 id
+themeLabel String 主题数据标签
+inPic String 图片输入地址
+sourceType Integer 来源类型 1 - 图片
+2 - 视频
+3 - 摄像头
+sourceName String 来源名称 附件名称、设备名
+称
+
+字段名 类型 说明 其他
+sourceId String 来源 id 附件 id、设备 id
+taskName String 任务名称
+duration String 时长
+alarmLevel Integer 报警等级
+label String 标签
+id String 数据主键 ID
+createTime String(date- 创建时间
+time)
+deleted Integer 删除标识
+inTime String(date- 解析开始时间
+time)
+outTime String(date- 解析完成时间
+time)
+receptionTime String(date- 接收时间
+time)
+picInVideoTime String 解析图片位于视频中时
+间
+computingPowerId String 算力 id
+computingPowerTime Long 算力时间
+lat String 纬度
+lng String 经度
+gbCode String 国标编码
+monitoringArea String 监控区域 JSON 字符串格式
+taskCreateUser Long 任务创建人
+alarmBoxs String 预警框信息 JSON 字符串格式
+alarmCount int 预警总数
+alarmInnerCount int 内部预警数
+expand1 String 拓展字段 1
+expand2 String 拓展字段 2
+expand3 String 拓展字段 3
+
+字段名 类型 说明 其他
+alarmOcr String 预警 ocr 识别信息
+alarmMsg String 预警内容描述
+branchName String 分支算法
+targetExpand String 目标跟踪拓展字段 JSON 字符串格式
+actualAngle Double 实际角度
+positiveAngle Double 角度 / 基准角度
+center List<Double> 中心点位 数组格式
+processId String 流程 id
+processInstanceId String 流程实例 id
+instanceDataId String 实例数据 id
+processNodeId String 流程节点 id
+alarmType String 预警类型 1 - 应用
+2 - 业务
+alarmNodes String 预警节点
+alarmNodeIds String 预警节点 ids
+kafkaReceiveImageId String kafka 收图图片 id
+kafkaReceiveExpand String kafka 收图扩展
+3. 推送 JSON 数据示例
+{
+"taskId": "0c55acb9f00f81c4425be364f7e16666",
+"streamId": "034fe0b297704cde880de8a060b56666",
+"themeTypeId": "1001",
+"themeName": "目标跟踪",
+"themeDataId": "2001",
+"themeLabel": "滞留预警",
+"inPic":
+"http://127.0.0.1:6666/afdmx/alarm/20260317/0a7048876bd74cfc879c5ffd29c66666_rtsp_aler
+t.jpg",
+"sourceType": 2,
+
+"sourceName": "1773734526845_566666.jpg",
+"sourceId": "6ccdeaa5b24047b9a831f5eb2fe66666",
+"taskName": "123",
+"duration": "503",
+"alarmLevel": 1,
+"label": "",
+"id": "0681e0503b804dc8ba8d056fe55c6666",
+"createTime": "2026-03-17 16:02:06",
+"deleted": null,
+"inTime": "2026-03-17 16:05:15",
+"outTime": "2026-03-17 16:02:06",
+"receptionTime": null,
+"picInVideoTime": "470",
+"computingPowerId": null,
+"computingPowerTime": null,
+"lat": null,
+"lng": null,
+"gbCode": null,
+"monitoringArea": null,
+"taskCreateUser": 10000,
+"alarmBoxs": "[{\"tag\":null,\"conf\":null,\"box\":
+[1141.0,230.0,1255.0,307.0],\"imgUrl\":null}]",
+"alarmCount": 0,
+"alarmInnerCount": 0,
+"expand1": "",
+"expand2": "",
+"expand3": "",
+"alarmOcr": null,
+"alarmMsg": null,
+"branchName": null,
+"targetExpand": "
+{\"startTime\":null,\"endTime\":null,\"num\":null,\"largeImageUrl\":\"http://127.0.0.1
+:9000/afdmx/img/20260317/0a7048876bd74666679c5ffd29c49be2_rtsp_alert.jpg\",\"smallImag
+eUrl\":\"http://127.0.0.1:9000/afdmx/imgcut/20260317/1773734526845_56666.jpg\",\"locat
+ionPoint\":\"[{\\\"tag\\\":null,\\\"conf\\\":null,\\\"box\\\":
+[1141.0,230.0,1255.0,307.0],\\\"imgUrl\\\":null}]\",\"picInVideoTime\":\"470\",\"area\
+":null,\"actualAngle\":null,\"positiveAngle\":null,\"center\":null}",
+"actualAngle": null,
+"positiveAngle": null,
+"center": null,
+"processId": null,
+
+"processInstanceId": null,
+"instanceDataId": null,
+"processNodeId": null,
+"alarmType": "1",
+"alarmNodes": null,
+"alarmNodeIds": null,
+"kafkaReceiveImageId": null,
+"kafkaReceiveExpand": null
+}
+4. 字段拓展说明
+4.1 alarmBoxs 结构说明
+[
+{
+"tag": "标签信息",
+"conf": "置信度",
+"box": [x1, y1, x2, y2],
+"imgUrl": "预警框对应图片地址"
+}
+]
+tag：预警框的标签信息，无标签时为 null；
+conf：预警框的置信度，用于标识预警的可信度，无相关数据时为 null；
+box：预警框在图片中的坐标集合，x1、y1 为左上角坐标，x2、y2 为右下角坐
+标，构成矩形预警区域；
+imgUrl：预警框对应图片的地址，无相关图片时为 null。
+4.2 targetExpand 结构说明
+{
+"startTime": "开始时间",
+"endTime": "结束时间",
+"num": "数量",
+"largeImageUrl": "全景图地址",
+"smallImageUrl": "缩略图地址",
+"locationPoint": "位置点位信息（JSON字符串格式）",
+"picInVideoTime": "图片在视频中的时间",
+
+"area": "区域信息",
+"actualAngle": "实际角度",
+"positiveAngle": "角度/基准角度",
+"center": "中心点位"
+}
+startTime：开始时间；
+endTime：结束时间；
+num：数量；
+largeImageUrl：全景图地址；
+smallImageUrl：缩略图地址；
+locationPoint：位置点位信息（JSON 字符串格式）；
+picInVideoTime：图片在视频中的时间；
+area：区域信息；
+actualAngle：实际角度；
+positiveAngle：角度 / 基准角度；
+center：中心点位。
+请求参数
+推送
+3.WebSocket
+3.1流水推送WebSocket
+基本信息
+Path： /apiWs/stream/data
+Method： HEAD
+接口描述：
+
+流水websocket
+接口地址
+ws://{ip}:{port}/apiWs/stream/data
+响应数据
+参数名称 参数说明 类型
+Object Base64加密后json（下面为entity属性） Object
+taskId 任务ID string
+themeTypeId 主题类型ID string
+themeName 主题名称ID string
+themeDataId 主题数据id string
+themeLabel 主题数据标签 string
+inPic 图片输入地址 string
+message 解析信息 string
+sourceType 来源类型 1图片 2视频 3摄像头 int
+sourceName 来源名称(附件名称，设备名称) string
+taskName 任务名称 string
+sourceId 来源ID string
+id 主键 string
+createTime 预警时间 long
+receptionTime 来源时间 long
+computingPowerId 算力id string
+computingPowerTime 算力时间 int
+lat 经纬度 string
+lng 经纬度 string
+gbCode 国标编码 string
+ocrMessage 文字识别信息 string
+monitoringArea 监控区域 string
+sourceType 来源类型 1图片 2视频 3摄像头 int
+
+参数名称 参数说明 类型
+sourceName 来源名称(附件名称，设备名称) string
+taskName 任务名称 string
+duration 时长 string
+picInVideoTime 图片位于视频中的时间 string
+taskCreateUser 创建人 long
+isAlarm 是否预警 0否;1是; string
+targetExpand 目标跟踪扩展 string
+isError 是否为异常数据0否;1是; string
+kafkaReceiveImageId kafka收图图片id string
+processId 流程id string
+processInstanceId 流程实例id string
+processNodeIds 流程节点id string
+streamType 流水类型 1任务;2智能体; string
+inTime 图片开始解析时间 long
+outTime 图片解析完成时间 long
+{
+"id": "123",
+"createTime": 1780985379701,
+"themeTypeId": "123",
+"taskId": "8dde371237e143130fe1fb5a6",
+"taskName": "找人",
+"themeName": "综合主题",
+"themeDataId": "54236cbd237c4369a65675577082b0b6",
+"themeLabel": "1779439944323_1",
+"label": "",
+"inPic": "[http://127.0.0.1:6666/test/test_files/20260609/139adb15485295815b3d.jpg]
+(http://192.168.2.209:9000/afdmx/offline_files/20260609/139adb15-6a46-405b-92f0-
+485295815b3d.jpg)",
+"sourceId": "12345cc688184b9a8812d5a273e759a1",
+"message": null,
+"sourceType": 1,
+"sourceName": "123hskz.jpg",
+"duration": null,
+
+"inTime": 1780985377000,
+"outTime": 1780985379000,
+"receptionTime": 1780985377000,
+"picInVideoTime": null,
+"taskCreateUser": 10043,
+"computingPowerId": "1234578b44af8a55ef1017ba9832b2ac3",
+"computingPowerTime": 2612,
+"lat": null,
+"lng": null,
+"gbCode": null,
+"ocrMessage": null,
+"monitoringArea": null,
+"isAlarm": "1",
+"targetExpand": null,
+"isError": "0",
+"kafkaReceiveImageId": null,
+"processId": null,
+"processInstanceId": null,
+"processNodeIds": null,
+"streamType": null
+}
+请求参数
+Headers
+参数名称 参数值 是否必须 示例 备注
+Sec-WebSocket-Protocol Bearer xxxx 是 Bearer xxxx
+返回数据
+名称 类型 是否必须 默认值 备注 其他信息
+
+3.2预警推送WebSocket
+基本信息
+Path： /apiWs/alarm/data
+Method： HEAD
+接口描述：
+预警websocket
+接口地址
+ws://{ip}:{port}/apiWs/alarm/data
+响应数据
+参数名称 参数说明 类型
+Object Base64加密后json（下面为entity属性） Object
+taskId 任务ID string
+streamId 流水ID string
+themeTypeId 主题类型ID string
+themeName 主题名称ID string
+themeDataId 算法ID string
+themeLabel 算法名称 string
+inPic 图片输入地址 string
+sourceType 来源类型 1图片 2视频 3摄像头 int(int32)
+sourceName 来源名称(附件名称，设备名称) string
+sourceId 来源id(附件id，设备id) string
+taskName 任务名称 string
+alarmLevel 报警等级 int(int32)
+id 主键 string
+
+参数名称 参数说明 类型
+createTime 预警时间 string(date-time)
+receptionTime 来源时间 string(date-time)
+computingPowerId 算力id string
+computingPowerTime 算力时间 int(int64)
+lat 经纬度 string
+lng 经纬度 string
+gbCode 国标编码 string
+monitoringArea 监控区域 string
+alarmBoxs 预警框 string
+alarmCount 预警数量 int(int32)
+alarmOcr 预警文字信息 string
+duration 时长 string
+label 标签 string
+inTime 开始解析时间 string(date-time)
+outTime 解析完成时间 string(date-time)
+picInVideoTime 解析图片位于视频中的时间 string
+taskCreateUser 创建人 int(int32)
+judgeFlag 研判0成功;1失败; int
+alarmInnerCount 内部报警数量 int
+alarmMsg 预警内容描述 string
+branchName 分支算法 string
+targetExpand 目标跟踪拓展 string
+actualAngle 实际角度 string
+positiveAngle 基准角度 string
+center 中心点位 string
+processId 流程id string
+processInstanceId 流程实例id string
+processNodeId 流程节点id string
+
+参数名称 参数说明 类型
+instanceDataId 实例数据id string
+alarmType 预警类型 1任务;2智能体; string
+alarmNodes 预警节点 string
+alarmNodeIds 预警节点ids string
+kafkaReceiveImageId kafka收图id string
+kafkaReceiveExpand kafka收图扩展 string
+alarmIds 预警id集合 string
+alarmStart 预警开始时间 string
+alarmEnd 预警结束时间 string
+deleted 删除标识 int
+{
+"id": "123",
+"createTime": 1780898604000,
+"deleted": 0,
+"streamId": "456",
+"taskId": "789",
+"taskName": "cd",
+"themeTypeId": "1",
+"themeName": "找人",
+"themeDataId": "2",
+"themeLabel": "有人",
+"inPic": "[http://127.0.0.1:9000/afdmx/alarm/20260608/123.jpg]
+(http://127.0.0.1:9000/afdmx/alarm/20260608/123.jpg)",
+"sourceType": 3,
+"sourceName": "全景摄像头",
+"sourceId": "4",
+"duration": null,
+"alarmLevel": 1,
+"inTime": "2026-06-08 14:03:23",
+"outTime": "2026-06-08 14:03:24",
+"receptionTime": "2026-06-08 14:03:23",
+"picInVideoTime": null,
+"taskCreateUser": 10000,
+"computingPowerId": "5",
+"computingPowerTime": 503,
+
+"lat": null,
+"lng": null,
+"gbCode": null,
+"judgeFlag": null,
+"monitoringArea": null,
+"alarmBoxs": "[{\"tag\":\"person\",\"conf\":0.9482421875,\"box\":
+[937.7808837890625,572.5667724609375,1073.8367919921875,718.7877807617188],\"imgUrl\":
+null},{\"tag\":\"person\",\"conf\":0.595703125,\"box\":
+[1226.06005859375,581.8865356445312,1286.8515625,719.1402587890625],\"imgUrl\":null},
+{\"tag\":\"person\",\"conf\":0.8564453125,\"box\":
+[1235.8721923828125,509.49053955078125,1280.244384765625,568.99169921875],\"imgUrl\":n
+ull},{\"tag\":\"person\",\"conf\":0.619140625,\"box\":
+[368.8461608886719,479.79010009765625,395.6314392089844,529.2080688476562],\"imgUrl\":
+null},{\"tag\":\"person\",\"conf\":0.8974609375,\"box\":
+[284.3704833984375,545.6331787109375,373.23028564453125,635.8302001953125],\"imgUrl\":
+null},{\"tag\":\"person\",\"conf\":0.90869140625,\"box\":
+[144.65252685546875,519.2987670898438,200.87669372558594,588.7294921875],\"imgUrl\":nu
+ll},{\"tag\":\"person\",\"conf\":0.884765625,\"box\":
+[156.82162475585938,479.2631530761719,195.50830078125,547.9147338867188],\"imgUrl\":nu
+ll},{\"tag\":\"person\",\"conf\":0.8662109375,\"box\":
+[8.152508735656738,559.949951171875,90.37545776367188,688.0820922851562],\"imgUrl\":nu
+ll},{\"tag\":\"person\",\"conf\":0.70166015625,\"box\":
+[1237.4615478515625,582.7669067382812,1285.340576171875,682.07568359375],\"imgUrl\":nu
+ll},{\"tag\":\"person\",\"conf\":0.92333984375,\"box\":
+[786.169677734375,543.9208374023438,872.5601806640625,720.5930786132812],\"imgUrl\":nu
+ll},{\"tag\":\"person\",\"conf\":0.8076171875,\"box\":
+[94.3934555053711,577.2554931640625,184.684326171875,720.2060546875],\"imgUrl\":null},
+{\"tag\":\"person\",\"conf\":0.923828125,\"box\":
+[972.9785766601562,483.21441650390625,1017.3731079101562,536.0411376953125],\"imgUrl\"
+:null},{\"tag\":\"person\",\"conf\":0.92626953125,\"box\":
+[1072.906494140625,625.784423828125,1156.10693359375,719.3726806640625],\"imgUrl\":nul
+l},{\"tag\":\"person\",\"conf\":0.912109375,\"box\":
+[446.832763671875,421.1235046386719,489.90399169921875,546.424560546875],\"imgUrl\":nu
+ll},{\"tag\":\"person\",\"conf\":0.8720703125,\"box\":
+[684.6363525390625,508.6173095703125,782.488525390625,612.74462890625],\"imgUrl\":null
+},{\"tag\":\"person\",\"conf\":0.89111328125,\"box\":
+[845.80859375,488.56060791015625,899.7529296875,546.6839599609375],\"imgUrl\":null},
+{\"tag\":\"person\",\"conf\":0.9208984375,\"box\":
+[1151.184814453125,486.5591125488281,1200.6055908203125,532.4727783203125],\"imgUrl\":
+null},{\"tag\":\"person\",\"conf\":0.65625,\"box\":
+[284.451904296875,546.3233642578125,373.5035705566406,718.1487426757812],\"imgUrl\":nu
+
+ll}]",
+"alarmCount": 18,
+"alarmInnerCount": 0,
+"alarmOcr": null,
+"alarmMsg": null,
+"branchName": null,
+"targetExpand": null,
+"actualAngle": null,
+"positiveAngle": null,
+"center": null,
+"processId": null,
+"processInstanceId": null,
+"processNodeId": null,
+"instanceDataId": null,
+"alarmType": "1",
+"alarmNodes": null,
+"alarmNodeIds": null,
+"kafkaReceiveImageId": null,
+"kafkaReceiveExpand": null,
+"alarmIds": "6",
+"alarmStart": 1780898603000,
+"alarmEnd": 1780898604000
+}
+请求参数
+Headers
+参数名称 参数值 是否必须 示例 备注
+Sec-WebSocket-Protocol Bearer xxxx 是 Bearer xxxx
+返回数据
+名称 类型 是否必须 默认值 备注 其他信息
