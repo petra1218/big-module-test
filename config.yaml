@@ -1,0 +1,16 @@
+# 服务内置默认配置（运行期可被前端提交覆盖）
+host: 0.0.0.0
+port: 10086
+# Kafka broker 地址（已确认无需 SASL）
+kafka_bootstrap_servers: "127.0.0.1:9092"
+# 接图 topic（支持自定义）
+topic_receive_image: "Q_VEHICLE_FRONT_FACE_SHARE_TO_XQ"
+# 固定测试设备值
+device_id: "verify-device-001"
+device_name: "验证设备"
+# 并发发送上限
+concurrency: 5
+# 单图完成超时（秒）
+timeout_seconds: 300
+# 登录 token 刷新间隔（秒），到期前刷新
+token_refresh_interval: 1800
