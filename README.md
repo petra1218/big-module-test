@@ -9,12 +9,19 @@
 
 ## 启动
 
-```bash
-chmod +x start.sh
-./start.sh
-```
+启动脚本会在首次运行时自动创建隔离的 Python 虚拟环境（`.venv`，已被 `.gitignore` 忽略），并在其中安装 `requirements.txt` 中的依赖，再以 `--reload` 调试模式启动服务。两个系统下的启动与依赖安装均使用 venv，不污染系统环境。
 
-脚本会自动检测并安装 `requirements.txt` 中的依赖，并以 `--reload` 调试模式启动。
+- Linux / Ubuntu：
+  ```bash
+  chmod +x start.sh
+  ./start.sh
+  ```
+- Windows：在资源管理器双击 `start.bat`，或在 cmd / PowerShell 中执行：
+  ```bat
+  start.bat
+  ```
+
+启动后浏览器打开 `http://<本机IP>:10086/`。
 
 ## 使用流程
 
