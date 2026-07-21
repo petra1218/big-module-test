@@ -1,48 +1,128 @@
 // 模型识别验证服务 前端逻辑
 
-// 左侧配置字段：大模型服务登录使用 AppKey/AppSecret（即 AK/SK）
-const FIELDS = [
-  ["app_key", "大模型服务 AppKey (AK)", "text"],
-  ["app_secret", "大模型服务 AppSecret (SK)", "password"],
-  ["api_base", "API Base (登录/WS域名, 不含路径)", "text"],
-  ["ws_base", "WebSocket Base (不含 /apiWs)", "text"],
-  ["minio_endpoint", "MinIO Endpoint", "text"],
-  ["minio_access_key", "MinIO AccessKey", "text"],
-  ["minio_secret_key", "MinIO SecretKey", "password"],
-  ["minio_bucket", "MinIO Bucket", "text"],
-  ["minio_secure", "MinIO Secure (true/false)", "text"],
-  ["minio_public_base_url", "MinIO 公网 Base URL", "text"],
-  ["directory", "MinIO 目录 (如 /vehicle/sichuan)", "text"],
-  ["kafka_bootstrap_servers", "Kafka BootstrapServers", "text"],
-  ["topic_receive_image", "接图 Topic", "text"],
-  ["device_id", "设备ID", "text"],
-  ["device_name", "设备名称", "text"],
-  ["concurrency", "并发数", "number"],
-  ["timeout_seconds", "超时秒数", "number"],
+// 左侧配置字段按系统分组；带 test 的分组在界面上提供「测试连接」按钮
+const GROUPS = [
+  {
+    title: "大模型服务",
+    test: "llm",
+    fields: [
+      ["app_key", "大模型服务 AppKey (AK)", "text"],
+      ["app_secret", "大模型服务 AppSecret (SK)", "password"],
+      ["api_base", "API Base (登录/WS域名, 不含路径)", "text"],
+    ],
+  },
+  {
+    title: "WebSocket",
+    test: "ws",
+    fields: [
+      ["ws_base", "WebSocket Base (不含 /apiWs)", "text"],
+    ],
+  },
+  {
+    title: "Kafka",
+    test: "kafka",
+    fields: [
+      ["kafka_bootstrap_servers", "Kafka BootstrapServers", "text"],
+      ["topic_receive_image", "接图 Topic", "text"],
+    ],
+  },
+  {
+    title: "MinIO",
+    test: "minio",
+    fields: [
+      ["minio_endpoint", "MinIO Endpoint", "text"],
+      ["minio_access_key", "MinIO AccessKey", "text"],
+      ["minio_secret_key", "MinIO SecretKey", "password"],
+      ["minio_bucket", "MinIO Bucket", "text"],
+      ["minio_secure", "MinIO Secure (true/false)", "text"],
+      ["minio_public_base_url", "MinIO 公网 Base URL", "text"],
+      ["directory", "MinIO 目录 (如 /vehicle/sichuan)", "text"],
+    ],
+  },
+  {
+    title: "其他",
+    fields: [
+      ["device_id", "设备ID", "text"],
+      ["device_name", "设备名称", "text"],
+      ["concurrency", "并发数", "number"],
+      ["timeout_seconds", "超时秒数", "number"],
+    ],
+  },
 ];
+
+// 扁平化字段列表，供读取/收集配置复用
+const ALL_FIELDS = GROUPS.flatMap((g) => g.fields);
 
 const LS_KEY = "verify_cfg_v1";
 let currentId = null;
 let pollTimer = null;
 
-// ---------- 配置表单 ----------
+// ---------- 配置表单（按分组渲染） ----------
 function buildForm() {
   const form = document.getElementById("cfgForm");
   const saved = JSON.parse(localStorage.getItem(LS_KEY) || "{}");
   form.innerHTML = "";
-  FIELDS.forEach(([key, label, type]) => {
-    const div = document.createElement("div");
-    div.className = "field";
-    const lab = document.createElement("label");
-    lab.textContent = label;
-    const inp = document.createElement("input");
-    inp.name = key;
-    inp.type = type;
-    inp.value = saved[key] ?? "";
-    div.appendChild(lab);
-    div.appendChild(inp);
-    form.appendChild(div);
+  GROUPS.forEach((g) => {
+    const group = document.createElement("div");
+    group.className = "group";
+
+    const head = document.createElement("div");
+    head.className = "group-head";
+    const h = document.createElement("h4");
+    h.textContent = g.title;
+    head.appendChild(h);
+    if (g.test) {
+      const btn = document.createElement("button");
+      btn.className = "btn-test";
+      btn.type = "button";
+      btn.textContent = "测试连接";
+      btn.dataset.test = g.test;
+      btn.onclick = () => testConn(g.test);
+      head.appendChild(btn);
+    }
+    group.appendChild(head);
+
+    g.fields.forEach(([key, label, type]) => {
+      const div = document.createElement("div");
+      div.className = "field";
+      const lab = document.createElement("label");
+      lab.textContent = label;
+      const inp = document.createElement("input");
+      inp.name = key;
+      inp.type = type;
+      inp.value = saved[key] ?? "";
+      div.appendChild(lab);
+      div.appendChild(inp);
+      group.appendChild(div);
+    });
+    form.appendChild(group);
   });
+}
+
+// ---------- 分组连接测试 ----------
+async function testConn(type) {
+  const cfg = collectForm();
+  const statusEl = document.getElementById("status");
+  statusEl.style.color = "#555";
+  statusEl.textContent = `正在测试「${type}」连接...`;
+  try {
+    const r = await fetch(`/api/test/${type}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(cfg),
+    });
+    const d = await r.json();
+    if (d.ok) {
+      statusEl.style.color = "#529b2e";
+      statusEl.textContent = `测试通过（${type}）：${d.message || ""}`;
+    } else {
+      statusEl.style.color = "#c0392b";
+      statusEl.textContent = `测试失败（${type}）：${d.error}`;
+    }
+  } catch (e) {
+    statusEl.style.color = "#c0392b";
+    statusEl.textContent = `测试请求异常（${type}）：${e}`;
+  }
 }
 
 async function loadServerConfig() {
@@ -50,7 +130,7 @@ async function loadServerConfig() {
     const r = await fetch("/api/config");
     const cfg = await r.json();
     const form = document.getElementById("cfgForm");
-    FIELDS.forEach(([key]) => {
+    ALL_FIELDS.forEach(([key]) => {
       const inp = form.elements[key];
       if (inp && cfg[key] != null && inp.value === "") {
         inp.value = cfg[key];
@@ -64,7 +144,7 @@ async function loadServerConfig() {
 function collectForm() {
   const form = document.getElementById("cfgForm");
   const cfg = {};
-  FIELDS.forEach(([key]) => {
+  ALL_FIELDS.forEach(([key]) => {
     cfg[key] = form.elements[key].value.trim();
   });
   localStorage.setItem(LS_KEY, JSON.stringify(cfg));

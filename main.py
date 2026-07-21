@@ -15,6 +15,7 @@ import minio_client
 import kafka_sender
 import ws_receiver
 import store
+import websockets
 
 log = logger.log
 
@@ -165,6 +166,87 @@ async def results():
 async def logs(limit: int = 200):
     """返回最近日志，便于对接调试时在前端判断错误。"""
     return {"logs": logger.recent_logs(limit)}
+
+# ---------- 分组连接测试接口 ----------
+async def _apply_cfg(req: dict):
+    set_runtime(req)
+    return current_cfg()
+
+@app.post("/api/test/llm")
+async def test_llm(req: dict):
+    """测试大模型服务登录（AK/SK）是否可用。"""
+    cfg = await _apply_cfg(req)
+    ak, sk, base = cfg.get("app_key"), cfg.get("app_secret"), cfg.get("api_base")
+    if not (ak and sk and base):
+        return JSONResponse({"ok": False, "error": "缺少 app_key / app_secret / api_base"})
+    try:
+        await asyncio.wait_for(auth.login(ak, sk, base), timeout=15)
+        return {"ok": True, "message": "登录成功，已获取 token"}
+    except Exception as e:
+        log.error("大模型服务连接测试失败: %s", e)
+        return JSONResponse({"ok": False, "error": f"登录/连接失败: {e}"})
+
+@app.post("/api/test/minio")
+async def test_minio(req: dict):
+    """测试 MinIO 连接与目录列举。"""
+    cfg = await _apply_cfg(req)
+    need = ["minio_endpoint", "minio_access_key", "minio_secret_key", "minio_bucket", "directory"]
+    miss = [k for k in need if not cfg.get(k)]
+    if miss:
+        return JSONResponse({"ok": False, "error": "缺少 MinIO 配置: " + ", ".join(miss)})
+    try:
+        names = await asyncio.to_thread(
+            minio_client.list_directory,
+            cfg["minio_endpoint"], cfg["minio_access_key"], cfg["minio_secret_key"],
+            cfg["minio_bucket"], _to_bool(cfg.get("minio_secure")), cfg["directory"])
+        if names:
+            return {"ok": True, "message": f"连接成功，目录下列出 {len(names)} 个文件（示例：{names[0]}）"}
+        return {"ok": True, "message": f"连接成功，但目录 {cfg['directory']} 下未找到文件"}
+    except Exception as e:
+        log.error("MinIO 连接测试失败: %s", e)
+        return JSONResponse({"ok": False, "error": f"MinIO 连接/列举失败: {e}"})
+
+@app.post("/api/test/kafka")
+async def test_kafka(req: dict):
+    """测试 Kafka bootstrap 连通性。"""
+    cfg = await _apply_cfg(req)
+    bs = cfg.get("kafka_bootstrap_servers")
+    if not bs:
+        return JSONResponse({"ok": False, "error": "缺少 kafka_bootstrap_servers"})
+    try:
+        producer = await asyncio.to_thread(kafka_sender.get_producer, bs)
+        connected = await asyncio.to_thread(producer.bootstrap_connected)
+        if connected:
+            return {"ok": True, "message": "Kafka 已连通"}
+        return JSONResponse({"ok": False, "error": "无法连接到 Kafka bootstrap（请检查地址/端口/网络）"})
+    except Exception as e:
+        log.error("Kafka 连接测试失败: %s", e)
+        return JSONResponse({"ok": False, "error": f"Kafka 连接失败: {e}"})
+
+@app.post("/api/test/ws")
+async def test_ws(req: dict):
+    """测试 WebSocket 连接：先登录取 token，再尝试连接 stream 通道。"""
+    cfg = await _apply_cfg(req)
+    if not cfg.get("ws_base"):
+        return JSONResponse({"ok": False, "error": "缺少 ws_base"})
+    try:
+        await asyncio.wait_for(
+            auth.login(cfg.get("app_key"), cfg.get("app_secret"), cfg.get("api_base")),
+            timeout=15)
+    except Exception as e:
+        return JSONResponse({"ok": False, "error": f"登录获取 token 失败: {e}"})
+    token = auth.get_token()
+    if not token:
+        return JSONResponse({"ok": False, "error": "登录后未获取到 token"})
+    uri = f"{cfg['ws_base'].rstrip('/')}/apiWs/stream/data"
+    try:
+        async with asyncio.wait_for(
+            websockets.connect(uri, additional_headers={"Sec-WebSocket-Protocol": f"Bearer {token}"}),
+            timeout=8):
+            return {"ok": True, "message": "WebSocket 连接成功"}
+    except Exception as e:
+        log.error("WebSocket 连接测试失败: %s", e)
+        return JSONResponse({"ok": False, "error": f"WebSocket 连接失败: {e}"})
 
 if __name__ == "__main__":
     uvicorn.run(app, host=DEFAULTS["host"], port=int(DEFAULTS["port"]))

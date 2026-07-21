@@ -9,3 +9,4 @@
 |------|----------|------|
 | 2026-07-21 | [2026-07-21-aksk-log-docs.md](2026-07-21-aksk-log-docs.md) | 大模型服务 AK/SK 界面输入、增加调试日志、建立 docs 追溯 |
 | 2026-07-21 | [2026-07-21-venv-startup.md](2026-07-21-venv-startup.md) | 新增 Windows 启动脚本、Linux/Windows 均改用 venv |
+| 2026-07-21 | [2026-07-21-config-groups-test.md](2026-07-21-config-groups-test.md) | 配置按系统分组，每组增加测试连接按钮 + 4 个测试接口 |

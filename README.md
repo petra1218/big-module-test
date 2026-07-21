@@ -26,13 +26,13 @@
 ## 使用流程
 
 1. 浏览器打开 `http://<本机IP>:10086/`。
-2. 在左侧配置区填写（运行期内驻留内存，刷新不丢；也记忆在浏览器 localStorage）：
-   - 大模型服务登录（AK/SK）：`app_key` / `app_secret`（即登录大模型服务使用的 AK/SK）
-   - 平台地址：`api_base`（如 `http://ip:port`）、`ws_base`（如 `ws://ip:port`）
-   - MinIO：`endpoint` / `access_key` / `secret_key` / `bucket` / `secure`（用于遍历目录）
-   - MinIO 公开基址：`minio_public_base_url`（模型可直连，拼成 `SceneImageUrl`）
-   - 目录名：`directory`
-   - `kafka_bootstrap_servers`、`concurrency`、`timeout_seconds`
+2. 在左侧配置区按系统分组填写（运行期内驻留内存，刷新不丢；也记忆在浏览器 localStorage）：
+   - **大模型服务**：`app_key` / `app_secret`（登录大模型服务使用的 AK/SK）、`api_base`
+   - **WebSocket**：`ws_base`（如 `ws://ip:port`）
+   - **Kafka**：`kafka_bootstrap_servers`、`topic_receive_image`
+   - **MinIO**：`endpoint` / `access_key` / `secret_key` / `bucket` / `secure` / `minio_public_base_url` / `directory`
+   - **其他**：`device_id` / `device_name` / `concurrency` / `timeout_seconds`
+   - 每组（大模型服务 / WebSocket / Kafka / MinIO）右侧均有「测试连接」按钮，可单独验证该系统的可达性与凭证是否正确，再正式「开始验证」。
 3. 点击「开始验证」：服务登录拿 token → 遍历 MinIO 目录 → 为每张图生成 32 位关联 ID → 通过 Kafka 发送到接图 topic（并发上限内）→ 两条 WebSocket（流水 / 预警）持续接收结果。
 4. 右侧结果区：左图为原图，右图按预警 `alarmBoxs` 绝对像素坐标画框并标注 `tag/conf`；下方分两栏展示流水信息与预警信息。左侧图片列表可点击切换，状态徽标：已发送 / 已完成 / 有预警 / 超时。
 
