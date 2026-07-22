@@ -1,25 +1,10 @@
 // 模型识别验证服务 前端逻辑
 
 // 左侧配置字段按系统分组；带 test 的分组在界面上提供「测试连接」按钮
+// 说明：发送图片到大模型只需 Kafka（无需登录）；登录(AK/SK)仅用于 WebSocket 取结果
 const GROUPS = [
   {
-    title: "大模型服务",
-    test: "llm",
-    fields: [
-      ["app_key", "大模型服务 AppKey (AK)", "text"],
-      ["app_secret", "大模型服务 AppSecret (SK)", "password"],
-      ["api_base", "API Base (登录/WS域名, 不含路径)", "text"],
-    ],
-  },
-  {
-    title: "WebSocket",
-    test: "ws",
-    fields: [
-      ["ws_base", "WebSocket Base (不含 /apiWs)", "text"],
-    ],
-  },
-  {
-    title: "Kafka",
+    title: "Kafka（发送图片到大模型）",
     test: "kafka",
     fields: [
       ["kafka_bootstrap_servers", "Kafka BootstrapServers", "text"],
@@ -27,7 +12,7 @@ const GROUPS = [
     ],
   },
   {
-    title: "MinIO",
+    title: "MinIO（图片源）",
     test: "minio",
     fields: [
       ["minio_endpoint", "MinIO Endpoint", "text"],
@@ -37,6 +22,16 @@ const GROUPS = [
       ["minio_secure", "MinIO Secure (true/false)", "text"],
       ["minio_public_base_url", "MinIO 公网 Base URL", "text"],
       ["directory", "MinIO 目录 (如 /vehicle/sichuan)", "text"],
+    ],
+  },
+  {
+    title: "结果接收（WebSocket，需登录鉴权）",
+    test: "ws",
+    fields: [
+      ["ws_base", "WebSocket Base (不含 /apiWs)", "text"],
+      ["app_key", "登录 AppKey (AK)", "text"],
+      ["app_secret", "登录 AppSecret (SK)", "password"],
+      ["api_base", "登录 API Base (取 token 的鉴权地址)", "text"],
     ],
   },
   {

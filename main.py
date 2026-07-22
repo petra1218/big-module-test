@@ -52,26 +52,19 @@ async def start_verify(req: dict):
     cfg = current_cfg()
     log.info("收到开始验证请求 配置(已脱敏)=%s", _mask_cfg(cfg))
 
+    # 发送图片只需 Kafka + MinIO 源；登录(AK/SK)仅用于 WebSocket 取结果，不在此强制
     required = [
-        "app_key", "app_secret", "api_base", "ws_base",
         "minio_endpoint", "minio_access_key", "minio_secret_key",
         "minio_bucket", "minio_public_base_url", "directory",
         "kafka_bootstrap_servers",
     ]
     missing = [k for k in required if not cfg.get(k)]
     if missing:
-        msg = "缺少必填配置: " + ", ".join(missing)
+        msg = "缺少必填配置(发送图片/图片源): " + ", ".join(missing)
         log.error(msg)
         return JSONResponse({"ok": False, "error": msg})
 
-    # 1) 登录大模型服务平台
-    try:
-        await auth.login(cfg["app_key"], cfg["app_secret"], cfg["api_base"])
-    except Exception as e:
-        log.error("登录失败, 终止启动: %s", e)
-        return JSONResponse({"ok": False, "error": f"登录失败: {e}"})
-
-    # 2) 遍历 MinIO 目录
+    # 1) 遍历 MinIO 目录（图片源，独立于登录）
     try:
         names = minio_client.list_directory(
             cfg["minio_endpoint"], cfg["minio_access_key"], cfg["minio_secret_key"],
@@ -84,7 +77,7 @@ async def start_verify(req: dict):
         log.warning("目录 %s 下未列出任何文件", cfg["directory"])
         return JSONResponse({"ok": False, "error": f"目录 {cfg['directory']} 下未找到文件"})
 
-    # 3) 生成关联 ID 与 MinIO 公网 URL
+    # 3) 生成关联 ID 与 MinIO 公网 URL 并登记
     base = cfg["minio_public_base_url"].rstrip("/")
     directory = cfg["directory"].strip("/")
     topic = cfg.get("topic_receive_image") or DEFAULTS["topic_receive_image"]
@@ -102,7 +95,26 @@ async def start_verify(req: dict):
         url = f"{base}/{directory}/{name}"
         store.register(rid, name, url)
 
-    # 4) 发送接图请求（并发 / 顺序两种可切换模式）
+    # 4) 启动结果接收：登录(AK/SK)仅用于 WebSocket 鉴权取 token，与图片发送无关
+    ws_base = cfg.get("ws_base")
+    if ws_base and cfg.get("app_key") and cfg.get("app_secret") and cfg.get("api_base"):
+        try:
+            await auth.login(cfg["app_key"], cfg["app_secret"], cfg["api_base"])
+            ws_base = ws_base.rstrip("/")
+            stream_uri = f"{ws_base}/apiWs/stream/data"
+            alarm_uri = f"{ws_base}/apiWs/alarm/data"
+            for t in _ws_tasks:
+                t.cancel()
+            _ws_tasks.clear()
+            _ws_tasks.append(asyncio.create_task(ws_receiver.ws_loop(stream_uri, "stream")))
+            _ws_tasks.append(asyncio.create_task(ws_receiver.ws_loop(alarm_uri, "alarm")))
+            log.info("WS 接收协程已启动(登录鉴权成功), 发送的图片结果将经此回传")
+        except Exception as e:
+            log.error("登录/WS 启动失败, 图片仍会发送但无法接收结果: %s", e)
+    else:
+        log.warning("未完整配置 登录/WS 参数, 仅经 Kafka 发送图片, 不接收结果")
+
+    # 5) 发送接图请求（并发 / 顺序），不依赖登录
     def build_msg(rid, name, url):
         return {
             "ID": rid,
@@ -143,17 +155,6 @@ async def start_verify(req: dict):
 
     asyncio.create_task(_run_submit())
 
-    # 5) 启动 WS 接收协程（流水 + 预警）
-    ws_base = cfg["ws_base"].rstrip("/")
-    stream_uri = f"{ws_base}/apiWs/stream/data"
-    alarm_uri = f"{ws_base}/apiWs/alarm/data"
-    for t in _ws_tasks:
-        t.cancel()
-    _ws_tasks.clear()
-    _ws_tasks.append(asyncio.create_task(ws_receiver.ws_loop(stream_uri, "stream")))
-    _ws_tasks.append(asyncio.create_task(ws_receiver.ws_loop(alarm_uri, "alarm")))
-    log.info("WS 接收协程已启动")
-
     return {"ok": True, "count": len(store.items)}
 
 @app.post("/api/stop")
@@ -183,20 +184,6 @@ async def logs(limit: int = 200):
 async def _apply_cfg(req: dict):
     set_runtime(req)
     return current_cfg()
-
-@app.post("/api/test/llm")
-async def test_llm(req: dict):
-    """测试大模型服务登录（AK/SK）是否可用。"""
-    cfg = await _apply_cfg(req)
-    ak, sk, base = cfg.get("app_key"), cfg.get("app_secret"), cfg.get("api_base")
-    if not (ak and sk and base):
-        return JSONResponse({"ok": False, "error": "缺少 app_key / app_secret / api_base"})
-    try:
-        await asyncio.wait_for(auth.login(ak, sk, base), timeout=15)
-        return {"ok": True, "message": "登录成功，已获取 token"}
-    except Exception as e:
-        log.error("大模型服务连接测试失败: %s", e)
-        return JSONResponse({"ok": False, "error": f"登录/连接失败: {e}"})
 
 @app.post("/api/test/minio")
 async def test_minio(req: dict):
