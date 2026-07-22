@@ -31,7 +31,7 @@
    - **WebSocket**：`ws_base`（如 `ws://ip:port`）
    - **Kafka**：`kafka_bootstrap_servers`、`topic_receive_image`
    - **MinIO**：`endpoint` / `access_key` / `secret_key` / `bucket` / `secure` / `minio_public_base_url` / `directory`
-   - **其他**：`device_id` / `device_name` / `concurrency` / `timeout_seconds`
+   - **其他**：`submit_mode`（并发 / 顺序提交，可切换）、`concurrency`（并发数，仅并发方式生效）、`seq_interval_seconds`（顺序提交间隔，单位秒）、`device_id` / `device_name` / `timeout_seconds`
    - 每组（大模型服务 / WebSocket / Kafka / MinIO）右侧均有「测试连接」按钮，可单独验证该系统的可达性与凭证是否正确，再正式「开始验证」。
 3. 点击「开始验证」：服务登录拿 token → 遍历 MinIO 目录 → 为每张图生成 32 位关联 ID → 通过 Kafka 发送到接图 topic（并发上限内）→ 两条 WebSocket（流水 / 预警）持续接收结果。
 4. 右侧结果区：左图为原图，右图按预警 `alarmBoxs` 绝对像素坐标画框并标注 `tag/conf`；下方分两栏展示流水信息与预警信息。左侧图片列表可点击切换，状态徽标：已发送 / 已完成 / 有预警 / 超时。

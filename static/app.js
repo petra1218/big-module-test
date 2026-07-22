@@ -42,9 +42,11 @@ const GROUPS = [
   {
     title: "其他",
     fields: [
+      ["submit_mode", "提交方式", "select", [["concurrent", "并发"], ["sequential", "顺序提交"]]],
+      ["concurrency", "并发数（并发方式下生效）", "number"],
+      ["seq_interval_seconds", "顺序提交间隔（秒）", "number"],
       ["device_id", "设备ID", "text"],
       ["device_name", "设备名称", "text"],
-      ["concurrency", "并发数", "number"],
       ["timeout_seconds", "超时秒数", "number"],
     ],
   },
@@ -82,15 +84,27 @@ function buildForm() {
     }
     group.appendChild(head);
 
-    g.fields.forEach(([key, label, type]) => {
+    g.fields.forEach(([key, label, type, options]) => {
       const div = document.createElement("div");
       div.className = "field";
       const lab = document.createElement("label");
       lab.textContent = label;
-      const inp = document.createElement("input");
+      let inp;
+      if (type === "select") {
+        inp = document.createElement("select");
+        (options || []).forEach(([val, txt]) => {
+          const opt = document.createElement("option");
+          opt.value = val;
+          opt.textContent = txt;
+          inp.appendChild(opt);
+        });
+        if (saved[key]) inp.value = saved[key];
+      } else {
+        inp = document.createElement("input");
+        inp.type = type;
+        inp.value = saved[key] ?? "";
+      }
       inp.name = key;
-      inp.type = type;
-      inp.value = saved[key] ?? "";
       div.appendChild(lab);
       div.appendChild(inp);
       group.appendChild(div);
@@ -154,6 +168,7 @@ function collectForm() {
 // ---------- 列表与详情 ----------
 function statusBadge(status) {
   const map = {
+    "待发送": "b-pending",
     "已完成": "b-done",
     "有预警": "b-alarm",
     "超时": "b-timeout",
@@ -171,7 +186,8 @@ async function refreshList() {
   d.items.forEach((it) => {
     const div = document.createElement("div");
     div.className = "list-item" + (it.id === currentId ? " active" : "");
-    div.innerHTML = `${it.filename || it.id}${statusBadge(it.status)}`;
+    const cost = it.cost_text && it.cost_text !== "-" ? `<span class="cost">耗时 ${it.cost_text}</span>` : "";
+    div.innerHTML = `${it.filename || it.id}${statusBadge(it.status)}${cost}`;
     div.onclick = () => { currentId = it.id; renderDetail(it); refreshList(); };
     list.appendChild(div);
   });
@@ -184,7 +200,7 @@ async function refreshList() {
 function renderDetail(it) {
   const el = document.getElementById("detail");
   const drawUrl = it.minio_url || (it.stream[0] && it.stream[0].sceneImgUrl);
-  let html = `<div class="meta">文件: ${it.filename || "-"} | 状态: ${statusBadge(it.status)} | 流水: ${it.stream_count} 条 | 预警: ${it.alarm_count} 条</div>`;
+  let html = `<div class="meta">文件: ${it.filename || "-"} | 状态: ${statusBadge(it.status)} | 流水: ${it.stream_count} 条 | 预警: ${it.alarm_count} 条 | 识别耗时: ${it.cost_text || "-"}</div>`;
   if (it.minio_url) html += `<div class="meta">MinIO: ${it.minio_url}</div>`;
   html += `<div class="row"><div>`;
   if (drawUrl) {

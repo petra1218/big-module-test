@@ -89,7 +89,9 @@ async def start_verify(req: dict):
     directory = cfg["directory"].strip("/")
     topic = cfg.get("topic_receive_image") or DEFAULTS["topic_receive_image"]
     bs = cfg["kafka_bootstrap_servers"]
+    mode = str(cfg.get("submit_mode") or DEFAULTS["submit_mode"]).lower()
     concurrency = int(cfg.get("concurrency") or DEFAULTS["concurrency"])
+    seq_interval = float(cfg.get("seq_interval_seconds") or DEFAULTS["seq_interval_seconds"])
     device_id = cfg.get("device_id") or DEFAULTS["device_id"]
     device_name = cfg.get("device_name") or DEFAULTS["device_name"]
 
@@ -100,30 +102,46 @@ async def start_verify(req: dict):
         url = f"{base}/{directory}/{name}"
         store.register(rid, name, url)
 
-    # 4) 并发发送接图请求
-    sem = asyncio.Semaphore(max(1, concurrency))
+    # 4) 发送接图请求（并发 / 顺序两种可切换模式）
+    def build_msg(rid, name, url):
+        return {
+            "ID": rid,
+            "DeviceID": device_id,
+            "DeviceName": device_name,
+            "SceneImageUrl": url,
+            "CatTime": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            "Expand": json.dumps({"filename": name}, ensure_ascii=False),
+        }
 
     async def send_one(rid, name, url):
-        async with sem:
-            msg = {
-                "ID": rid,
-                "DeviceID": device_id,
-                "DeviceName": device_name,
-                "SceneImageUrl": url,
-                "CatTime": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-                "Expand": json.dumps({"filename": name}, ensure_ascii=False),
-            }
-            try:
-                await asyncio.to_thread(kafka_sender.send_message, bs, topic, msg)
-            except Exception as e:
-                log.error("接图请求发送失败 id=%s file=%s: %s", rid, name, e)
+        try:
+            await asyncio.to_thread(kafka_sender.send_message, bs, topic, build_msg(rid, name, url))
+            store.mark_sent(rid)  # 记录实际发送时间，用于计算识别耗时
+        except Exception as e:
+            log.error("接图请求发送失败 id=%s file=%s: %s", rid, name, e)
 
-    send_tasks = [
-        asyncio.create_task(send_one(r["id"], r["filename"], r["minio_url"]))
-        for r in store.items.values()
-    ]
-    log.info("已并发发起 %d 张图片的接图请求 (并发上限=%d, topic=%s)",
-             len(send_tasks), concurrency, topic)
+    async def _run_submit():
+        total = len(store.items)
+        if mode == "sequential":
+            log.info("顺序提交模式 间隔=%.2fs 共 %d 张", seq_interval, total)
+            for r in list(store.items.values()):
+                await send_one(r["id"], r["filename"], r["minio_url"])
+                await asyncio.sleep(seq_interval)
+            log.info("顺序提交全部完成 共 %d 张", total)
+        else:
+            sem = asyncio.Semaphore(max(1, concurrency))
+            async def send_one_limited(rid, name, url):
+                async with sem:
+                    await send_one(rid, name, url)
+            tasks = [
+                asyncio.create_task(send_one_limited(r["id"], r["filename"], r["minio_url"]))
+                for r in store.items.values()
+            ]
+            log.info("并发提交模式 并发上限=%d 共 %d 张 topic=%s", concurrency, len(tasks), topic)
+            await asyncio.gather(*tasks, return_exceptions=True)
+            log.info("并发提交全部完成 共 %d 张", len(tasks))
+
+    asyncio.create_task(_run_submit())
 
     # 5) 启动 WS 接收协程（流水 + 预警）
     ws_base = cfg["ws_base"].rstrip("/")
@@ -136,13 +154,7 @@ async def start_verify(req: dict):
     _ws_tasks.append(asyncio.create_task(ws_receiver.ws_loop(alarm_uri, "alarm")))
     log.info("WS 接收协程已启动")
 
-    async def _await_send():
-        await asyncio.gather(*send_tasks, return_exceptions=True)
-        log.info("全部接图请求已发送完毕")
-
-    asyncio.create_task(_await_send())
-
-    return {"ok": True, "count": len(send_tasks)}
+    return {"ok": True, "count": len(store.items)}
 
 @app.post("/api/stop")
 async def stop_verify():

@@ -11,3 +11,4 @@
 | 2026-07-21 | [2026-07-21-venv-startup.md](2026-07-21-venv-startup.md) | 新增 Windows 启动脚本、Linux/Windows 均改用 venv |
 | 2026-07-21 | [2026-07-21-config-groups-test.md](2026-07-21-config-groups-test.md) | 配置按系统分组，每组增加测试连接按钮 + 4 个测试接口 |
 | 2026-07-21 | [2026-07-21-layout-no-scroll.md](2026-07-21-layout-no-scroll.md) | 页面三栏各自内部滚动，去掉总体滚动条 |
+| 2026-07-22 | [2026-07-22-submit-mode-cost.md](2026-07-22-submit-mode-cost.md) | 并发/顺序可切换提交、并发数与间隔设置、识别耗时展示 |

@@ -15,6 +15,8 @@ DEFAULTS = {
     "device_id": "verify-device-001",
     "device_name": "验证设备",
     "concurrency": 5,
+    "submit_mode": "concurrent",
+    "seq_interval_seconds": 1,
     "timeout_seconds": 300,
     "token_refresh_interval": 1800,
 }
